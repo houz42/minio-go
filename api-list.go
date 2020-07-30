@@ -36,6 +36,7 @@ import (
 //       fmt.Println(message)
 //   }
 //
+
 func (c Client) ListBuckets(ctx context.Context) ([]BucketInfo, error) {
 	// Execute GET on service.
 	resp, err := c.executeMethod(ctx, http.MethodGet, requestMetadata{contentSHA256Hex: emptySHA256Hex})
@@ -656,6 +657,35 @@ func (c Client) ListObjects(ctx context.Context, bucketName string, opts ListObj
 	}
 
 	return c.listObjectsV2(ctx, bucketName, opts.Prefix, opts.Recursive, opts.WithMetadata, opts.MaxKeys)
+}
+
+//ListObjectsWithMarker return contents in this bucket with marker
+func (c Client) ListObjectsWithMarker(ctx context.Context, bucketName string, marker string, opts ListObjectsOptions) (ListBucketResult, error) {
+
+	return c.listObjectsWithMarker(ctx, bucketName, opts.Prefix, marker, opts.Recursive, opts.MaxKeys)
+}
+
+func (c Client) listObjectsWithMarker(ctx context.Context, bucketName, objectPrefix, objectMarker string, recursive bool, maxKeys int) (ListBucketResult, error) {
+
+	delimiter := "/"
+	if recursive {
+		// If recursive we do not delimit.
+		delimiter = ""
+	}
+
+	res, err := c.listObjectsQuery(ctx, bucketName, objectPrefix, objectMarker, delimiter, maxKeys)
+	if err != nil {
+		return ListBucketResult{}, err
+	}
+
+	if res.IsTruncated && res.NextMarker == "" {
+		for _, object := range res.Contents {
+			// Save the marker.
+			res.NextMarker = object.Key
+		}
+	}
+
+	return res, err
 }
 
 // ListIncompleteUploads - List incompletely uploaded multipart objects.
